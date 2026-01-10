@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-tv-bg text-white font-sans;
+  }
+}
+
+/* Custom scrollbar for TV UI */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-700/50 rounded-full hover:bg-gray-600;
+}
+
+/* EPG Grid Styles */
+.epg-grid-container {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  height: calc(100vh - 80px);
+}
+
+.channel-sidebar {
+  @apply border-r border-gray-800 bg-tv-surface overflow-y-auto;
+}
+
+.timeline-content {
+  @apply relative overflow-x-auto overflow-y-auto bg-tv-bg;
+}
