@@ -1,29 +1,27 @@
 # IPTV Player Pro 📺
 
-A premium, web-based IPTV player with a "10-foot UI" experience, designed for both desktop and TV browsing. Built with modern web technologies and synchronized with the cloud.
+A premium, web-based IPTV player with a "10-foot UI" experience, designed for both desktop and TV browsing. Built with modern web technologies with local storage for playlists and favorites.
 
 ![IPTV Player Pro](https://img.shields.io/badge/Status-Beta-blueviolet?style=for-the-badge)
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=fixed)
 ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
 ## ✨ Features
 
-- **🚀 Seamless Auto-Sync**: Log in with Google to automatically load your IPTV playlists and favorites from the cloud.
 - **📡 M3U & Xtream Support**: Full support for standard M3U playlists and Xtream Codes API (Server/User/Pass).
-- **⭐ Cloud Favorites**: Save and sync your favorite channels across all your devices.
+- **⭐ Local Favorites**: Save your favorite channels locally in your browser.
 - **🔍 Unified Search**: Tivimate-style search bar to filter channels across all categories in real-time.
-- **📅 EPG Grid**: A TV-style Electronic Program Guide interface.
+- **📅 EPG Grid**: A TV-style Electronic Program Guide with XMLTV support, automatic 8-hour refresh, and manual refresh option.
 - **🖱️ Draggable Navigation**: An interactive, draggable sidebar toggle for flexible UI control.
 - **📱 Responsive Design**: Fully optimized for large screens, desktops, and mobile/touch devices.
+- **💾 Local Storage**: All data (playlists, favorites, credentials) stored locally in your browser.
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: React (Vite)
 - **Styling**: Tailwind CSS
 - **Icons**: Lucide React
-- **Backend/Auth**: Firebase (Auth & Firestore)
-- **State Management**: Zustand
+- **State Management**: Zustand (with localStorage persistence)
 - **Video Player**: Hls.js
 
 ## 🚀 Getting Started
@@ -31,7 +29,6 @@ A premium, web-based IPTV player with a "10-foot UI" experience, designed for bo
 ### Prerequisites
 
 - Node.js (v16 or higher)
-- A Firebase project (for Auth & Firestore)
 
 ### Installation
 
@@ -46,13 +43,20 @@ A premium, web-based IPTV player with a "10-foot UI" experience, designed for bo
    npm install
    ```
 
-3. Configure Firebase:
-   Update `src/firebase.js` with your project credentials.
-
-4. Run the development server:
+3. Run the development server:
    ```bash
    npm run dev
    ```
+
+4. Open your browser and navigate to the URL shown in the terminal (typically `http://localhost:5173`)
+
+## 📖 Usage
+
+1. **Load Playlist**: Click "Settings & Playlist" in the sidebar to add your M3U URL or Xtream Codes credentials.
+2. **Browse Channels**: Use the sidebar to filter by category or search for specific channels.
+3. **Watch**: Click on any channel to start streaming.
+4. **EPG**: The EPG grid automatically loads program guide data from your Xtream provider's XMLTV feed and refreshes every 8 hours.
+5. **Favorites**: Click the star icon on any channel to add it to your favorites.
 
 ## 📸 Screenshots
 
