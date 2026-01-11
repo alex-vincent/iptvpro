@@ -1,8 +1,5 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useStore } from '../../store/useStore';
-import { useAuth } from '../../hooks/useAuth';
-import { db } from '../../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
 import { Monitor, Clock, Star, Loader2 } from 'lucide-react';
 import { fetchXtreamEPG } from '../../utils/xtreamClient';
 
@@ -16,7 +13,6 @@ const EPGGrid = () => {
         toggleFavorite,
         xtreamCredentials
     } = useStore();
-    const { user } = useAuth();
     const [epgData, setEpgData] = useState({}); // { streamId: [listings] }
     const [loadingEpg, setLoadingEpg] = useState(false);
     const [epgDisabled, setEpgDisabled] = useState(false);
@@ -82,17 +78,9 @@ const EPGGrid = () => {
         return () => clearTimeout(timer);
     }, [filteredChannels, xtreamCredentials, epgDisabled]);
 
-    const handleToggleFav = async (e, channelName) => {
+    const handleToggleFav = (e, channelName) => {
         e.stopPropagation();
         toggleFavorite(channelName);
-        if (user) {
-            const docRef = doc(db, 'users', user.uid);
-            const isFav = favorites.includes(channelName);
-            const newFavs = isFav
-                ? favorites.filter(n => n !== channelName)
-                : [...favorites, channelName];
-            await updateDoc(docRef, { favorites: newFavs });
-        }
     };
 
     // Generate a mock timeline for the next 4 hours

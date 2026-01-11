@@ -1,14 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { db } from '../../firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { useAuth } from '../../hooks/useAuth';
+import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { fetchPlaylist } from '../../utils/m3uParser';
 import { fetchXtreamChannels, loginXtream } from '../../utils/xtreamClient';
-import { Plus, Database, Globe, Key, Loader2, Server, User, Lock, ArrowLeft, Trash2 } from 'lucide-react';
+import { Plus, Database, Globe, Loader2, Server, User, Lock, ArrowLeft, Trash2 } from 'lucide-react';
 
 const PlaylistManager = () => {
-    const { user } = useAuth();
     const { setChannels, setForceShowPlaylistManager, forceShowPlaylistManager, channels, clearCache, setXtreamCredentials } = useStore();
     const [mode, setMode] = useState('m3u'); // 'm3u' or 'xtream'
     const [url, setUrl] = useState('');
@@ -23,28 +19,6 @@ const PlaylistManager = () => {
         }
     };
 
-    useEffect(() => {
-        const loadSaved = async () => {
-            if (!user) return;
-            try {
-                const docSnap = await getDoc(doc(db, 'users', user.uid));
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    if (data.type === 'xtream') {
-                        setMode('xtream');
-                        if (data.xtream) setXtream(data.xtream);
-                    } else if (data.playlistUrl) {
-                        setMode('m3u');
-                        setUrl(data.playlistUrl);
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to load settings:", err);
-            }
-        };
-        loadSaved();
-    }, [user]);
-
     const handleFetchM3U = async (targetUrl = url) => {
         if (!targetUrl) return;
         setLoading(true);
@@ -53,14 +27,6 @@ const PlaylistManager = () => {
             const fetched = await fetchPlaylist(targetUrl);
             setChannels(fetched);
             setForceShowPlaylistManager(false);
-
-            if (user) {
-                await setDoc(doc(db, 'users', user.uid), {
-                    type: 'm3u',
-                    playlistUrl: targetUrl,
-                    updatedAt: new Date().toISOString()
-                }, { merge: true });
-            }
         } catch (err) {
             setError('Failed to fetch M3U playlist. Check URL and CORS.');
         } finally {
@@ -78,14 +44,6 @@ const PlaylistManager = () => {
             const fetched = await fetchXtreamChannels(credentials.url, credentials.user, credentials.pass);
             setChannels(fetched);
             setForceShowPlaylistManager(false);
-
-            if (user) {
-                await setDoc(doc(db, 'users', user.uid), {
-                    type: 'xtream',
-                    xtream: credentials,
-                    updatedAt: new Date().toISOString()
-                }, { merge: true });
-            }
         } catch (err) {
             setError('Xtream login failed. Check credentials and server URL.');
         } finally {

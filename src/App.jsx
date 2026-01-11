@@ -1,117 +1,53 @@
-import React, { useEffect } from 'react'
-import { useAuth } from './hooks/useAuth'
+import React from 'react'
 import Player from './components/Player/Player'
 import Sidebar from './components/Layout/Sidebar'
 import PlaylistManager from './components/Playlist/PlaylistManager'
 import EPGGrid from './components/Dashboard/EPGGrid'
 import { useStore } from './store/useStore'
-import { db } from './firebase'
-import { doc, getDoc } from 'firebase/firestore'
-import { fetchPlaylist } from './utils/m3uParser'
-import { fetchXtreamChannels, loginXtream } from './utils/xtreamClient'
 import DraggableToggle from './components/Shared/DraggableToggle'
+import { AlertCircle, X } from 'lucide-react'
 
 function App() {
-    const { user, loading, loginWithGoogle } = useAuth();
+    const [showBanner, setShowBanner] = React.useState(true);
     const {
         selectedChannel,
         isSidebarOpen,
         toggleSidebar,
         channels,
-        setChannels,
-        setFavorites,
-        isSyncing,
-        setIsSyncing,
         forceShowPlaylistManager,
-        setForceShowPlaylistManager,
-        setXtreamCredentials
     } = useStore();
 
-    useEffect(() => {
-        const syncData = async () => {
-            if (!user) return;
-
-            // Only block UI if we have no channels at all
-            const needsInitialSync = channels.length === 0;
-            if (needsInitialSync) setIsSyncing(true);
-
-            try {
-                const docRef = doc(db, 'users', user.uid);
-                const docSnap = await getDoc(docRef);
-
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    if (data.favorites) setFavorites(data.favorites);
-
-                    if (data.type === 'xtream' && data.xtream) {
-                        const { url, user: u, pass } = data.xtream;
-                        setXtreamCredentials({ url, user: u, pass });
-                        await loginXtream(url, u, pass);
-                        const fetchedChannels = await fetchXtreamChannels(url, u, pass);
-                        setChannels(fetchedChannels);
-                    } else if (data.playlistUrl) {
-                        const fetchedChannels = await fetchPlaylist(data.playlistUrl);
-                        setChannels(fetchedChannels);
-                    }
-                }
-            } catch (error) {
-                console.error("Auto-sync failed:", error);
-            } finally {
-                setIsSyncing(false);
-            }
-        };
-
-        if (user) syncData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user]); // Only run when user changes (login/logout)
-
-    if (loading || (user && isSyncing && channels.length === 0)) {
-        return (
-            <div className="flex h-screen flex-col items-center justify-center bg-tv-bg">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-tv-accent mb-6"></div>
-                {isSyncing && (
-                    <div className="text-center">
-                        <p className="text-gray-400 animate-pulse font-medium mb-4">Syncing your playlist...</p>
-                        <button
-                            onClick={() => setIsSyncing(false)}
-                            className="text-xs text-gray-500 hover:text-white border border-gray-800 px-4 py-2 rounded-lg transition active:scale-95"
-                        >
-                            Cancel & Setup Manually
-                        </button>
-                    </div>
-                )}
-            </div>
-        );
-    }
-
-    if (!user) {
-        return (
-            <div className="flex h-screen flex-col items-center justify-center bg-tv-bg p-4 text-center">
-                <h1 className="mb-6 text-4xl font-bold text-white">IPTV Player Pro</h1>
-                <p className="mb-8 text-gray-400 max-w-md">The ultimate web-based 10-foot UI IPTV experience. Sign in to sync your playlists and start watching.</p>
-                <button
-                    onClick={loginWithGoogle}
-                    className="rounded bg-tv-accent px-8 py-3 font-semibold text-white transition hover:bg-blue-600 active:scale-95"
-                >
-                    Sign in with Google
-                </button>
-            </div>
-        );
-    }
-
     return (
-        <div className="flex h-screen w-screen bg-tv-bg overflow-hidden text-white">
-            {!isSidebarOpen && <DraggableToggle onToggle={toggleSidebar} />}
-            <Sidebar />
-            <main className="flex-1 h-full min-w-0 relative">
-                {selectedChannel ? (
-                    <Player streamUrl={selectedChannel.url} title={selectedChannel.name} />
-                ) : (forceShowPlaylistManager || (!channels || channels.length === 0)) ? (
-                    <PlaylistManager />
-                ) : (
-                    <EPGGrid />
-                )}
-            </main>
+        <div className="flex h-screen w-screen bg-tv-bg overflow-hidden text-white flex-col">
+            {/* HTTP Mixed Content Warning Banner */}
+            {showBanner && window.location.protocol === 'http:' && (
+                <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 flex items-center justify-between text-[10px] text-amber-500 uppercase tracking-widest font-bold animate-in slide-in-from-top duration-300">
+                    <div className="flex items-center gap-2 flex-1 justify-center">
+                        <AlertCircle size={14} />
+                        <span>HTTP Mode: Browser protocol must match your M3U/Xtream provider links</span>
+                    </div>
+                    <button
+                        onClick={() => setShowBanner(false)}
+                        className="p-1 hover:bg-amber-500/20 rounded-full transition-colors active:scale-95 text-amber-500/60 hover:text-amber-500"
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
+            )}
+
+            <div className="flex flex-1 overflow-hidden">
+                {!isSidebarOpen && <DraggableToggle onToggle={toggleSidebar} />}
+                <Sidebar />
+                <main className="flex-1 h-full min-w-0 relative">
+                    {selectedChannel ? (
+                        <Player streamUrl={selectedChannel.url} title={selectedChannel.name} />
+                    ) : (forceShowPlaylistManager || (!channels || channels.length === 0)) ? (
+                        <PlaylistManager />
+                    ) : (
+                        <EPGGrid />
+                    )}
+                </main>
+            </div>
         </div>
     );
 }

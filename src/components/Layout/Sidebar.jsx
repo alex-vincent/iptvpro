@@ -1,9 +1,6 @@
 import React, { useMemo } from 'react';
 import { useStore } from '../../store/useStore';
-import { Menu, ChevronLeft, Monitor, List, Settings, LogOut, Star, Search } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
-import { db } from '../../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { ChevronLeft, Monitor, List, Settings, Star, Search } from 'lucide-react';
 
 const Sidebar = () => {
     const {
@@ -21,14 +18,10 @@ const Sidebar = () => {
         setForceShowPlaylistManager
     } = useStore();
 
-    // ... handleSettings function
     const handleOpenSettings = () => {
         setForceShowPlaylistManager(true);
         if (window.innerWidth < 1024) toggleSidebar();
     };
-
-    // ... rest of Sidebar
-    const { logout, user } = useAuth();
 
     const filteredChannels = useMemo(() => {
         let base = channels;
@@ -48,18 +41,9 @@ const Sidebar = () => {
         return base;
     }, [channels, currentGroup, favorites, searchQuery]);
 
-    const handleToggleFav = async (e, channelName) => {
+    const handleToggleFav = (e, channelName) => {
         e.stopPropagation();
         toggleFavorite(channelName);
-        if (user) {
-            const docRef = doc(db, 'users', user.uid);
-            // Optimized: We should really get the latest from state but for simplicity here:
-            const isFav = favorites.includes(channelName);
-            const newFavs = isFav
-                ? favorites.filter(n => n !== channelName)
-                : [...favorites, channelName];
-            await updateDoc(docRef, { favorites: newFavs });
-        }
     };
 
     const sidebarGroups = ['All', 'Favorites', ...groups.filter(g => g !== 'All')];
@@ -81,7 +65,7 @@ const Sidebar = () => {
                         </button>
                     </div>
 
-                    {/* Search Bar - Tivimate Style */}
+                    {/* Search Bar */}
                     <div className="relative group">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-tv-accent transition-colors" size={18} />
                         <input
@@ -155,37 +139,19 @@ const Sidebar = () => {
                                     <p className="text-gray-600 text-xs italic">No channels found</p>
                                 </div>
                             )}
-                            {filteredChannels.length > 50 && (
-                                <p className="text-center text-[10px] text-gray-600 mt-2 italic px-2">Showing top 50 matches...</p>
-                            )}
                         </div>
                     </div>
                 </div>
 
-                <div className="p-4 bg-gray-900/80 border-t border-gray-800">
-                    <div className="flex items-center gap-3 p-2 bg-gray-800/40 rounded-xl mb-3">
-                        <img src={user?.photoURL} alt="" className="w-10 h-10 rounded-lg shadow-md" />
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold truncate leading-tight">{user?.displayName}</p>
-                            <p className="text-[10px] text-gray-500 truncate">{user?.email}</p>
-                        </div>
-                    </div>
-                    <div className="space-y-1">
-                        <button
-                            onClick={handleOpenSettings}
-                            className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-white transition"
-                        >
-                            <Settings size={16} />
-                            Settings
-                        </button>
-                        <button
-                            onClick={logout}
-                            className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-400/10 transition"
-                        >
-                            <LogOut size={16} />
-                            Sign Out
-                        </button>
-                    </div>
+                <div className="p-4 bg-gray-900/80 border-t border-gray-800 font-medium">
+                    <button
+                        onClick={handleOpenSettings}
+                        className="flex items-center justify-center gap-2 w-full px-3 py-3 rounded-xl text-sm bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white transition shadow-lg active:scale-[0.98]"
+                    >
+                        <Settings size={18} />
+                        Settings & Playlist
+                    </button>
+                    <p className="text-[9px] text-gray-600 mt-4 text-center uppercase tracking-tighter">Local Storage Only Mode</p>
                 </div>
             </div>
         </aside>
