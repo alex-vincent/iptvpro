@@ -1,16 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { fetchPlaylist } from '../../utils/m3uParser';
-import { fetchXtreamChannels, loginXtream } from '../../utils/xtreamClient';
-import { Plus, Database, Globe, Loader2, Server, User, Lock, ArrowLeft, Trash2 } from 'lucide-react';
+import { fetchXtreamChannels, loginXtream, fetchXtreamXMLTV } from '../../utils/xtreamClient';
+import { parseXMLTV } from '../../utils/xmltvParser';
+import { Plus, Database, Globe, Loader2, Server, User, Lock, ArrowLeft, Trash2, RefreshCw, Clock } from 'lucide-react';
 
 const PlaylistManager = () => {
-    const { setChannels, setForceShowPlaylistManager, forceShowPlaylistManager, channels, clearCache, setXtreamCredentials } = useStore();
+    const { 
+        setChannels, 
+        setForceShowPlaylistManager, 
+        forceShowPlaylistManager, 
+        channels, 
+        clearCache, 
+        setXtreamCredentials,
+        xtreamCredentials,
+        xmltvData,
+        xmltvLastRefresh,
+        setXmltvData
+    } = useStore();
     const [mode, setMode] = useState('m3u'); // 'm3u' or 'xtream'
     const [url, setUrl] = useState('');
     const [xtream, setXtream] = useState({ url: '', user: '', pass: '' });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [refreshingEpg, setRefreshingEpg] = useState(false);
+    const [epgError, setEpgError] = useState(null);
+
+    // Load stored Xtream credentials into form
+    useEffect(() => {
+        if (xtreamCredentials) {
+            setXtream({
+                url: xtreamCredentials.url || '',
+                user: xtreamCredentials.user || '',
+                pass: xtreamCredentials.pass || ''
+            });
+        }
+    }, [xtreamCredentials]);
 
     const handleClearCache = () => {
         if (confirm('Are you sure you want to clear the local playlist cache? This will reload data from the server.')) {
@@ -53,6 +78,48 @@ const PlaylistManager = () => {
 
     const onBack = () => {
         setForceShowPlaylistManager(false);
+    };
+
+    // Format timestamp to EST
+    const formatESTTime = (timestamp) => {
+        if (!timestamp) return 'Never';
+        const date = new Date(timestamp);
+        return date.toLocaleString('en-US', {
+            timeZone: 'America/New_York',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            timeZoneName: 'short'
+        });
+    };
+
+    // Handle EPG refresh
+    const handleRefreshEPG = async () => {
+        if (!xtreamCredentials) return;
+        
+        setRefreshingEpg(true);
+        setEpgError(null);
+
+        try {
+            const xmlString = await fetchXtreamXMLTV(
+                xtreamCredentials.url,
+                xtreamCredentials.user,
+                xtreamCredentials.pass
+            );
+            
+            const parsedData = parseXMLTV(xmlString);
+            setXmltvData(parsedData, Date.now());
+            setEpgError(null);
+        } catch (err) {
+            console.error('Failed to refresh EPG:', err);
+            const errorMessage = err.message || 'Unknown error occurred';
+            setEpgError(`Failed to refresh EPG: ${errorMessage}`);
+        } finally {
+            setRefreshingEpg(false);
+        }
     };
 
     return (
@@ -186,6 +253,50 @@ const PlaylistManager = () => {
                         </form>
                     )}
                 </div>
+
+                {/* EPG Settings Section - Only show when Xtream credentials are set */}
+                {xtreamCredentials && (
+                    <div className="mt-8 pt-8 border-t border-gray-800">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h2 className="text-lg font-bold text-white mb-1">EPG Settings</h2>
+                                <p className="text-sm text-gray-400">Electronic Program Guide data</p>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-gray-900/50 rounded-lg p-4 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-sm text-gray-400">
+                                    <Clock size={16} />
+                                    <span>Last Updated:</span>
+                                    <span className="text-gray-300 font-medium">
+                                        {formatESTTime(xmltvLastRefresh)}
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={handleRefreshEPG}
+                                    disabled={refreshingEpg}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-tv-accent/20 hover:bg-tv-accent/30 text-tv-accent transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <RefreshCw size={16} className={refreshingEpg ? 'animate-spin' : ''} />
+                                    {refreshingEpg ? 'Refreshing...' : 'Refresh EPG'}
+                                </button>
+                            </div>
+                            
+                            {epgError && (
+                                <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-500 text-sm">
+                                    {epgError}
+                                </div>
+                            )}
+                            
+                            {xmltvData && (
+                                <div className="text-xs text-gray-500">
+                                    EPG data loaded for {Object.keys(xmltvData).length} channels
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

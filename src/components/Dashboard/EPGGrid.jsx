@@ -1,7 +1,8 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
-import { Monitor, Clock, Star, Loader2 } from 'lucide-react';
-import { fetchXtreamEPG } from '../../utils/xtreamClient';
+import { Monitor, Clock, Star, Loader2, RefreshCw } from 'lucide-react';
+import { fetchXtreamXMLTV } from '../../utils/xtreamClient';
+import { parseXMLTV, getCurrentAndNextProgram, formatXMLTVTime } from '../../utils/xmltvParser';
 
 const EPGGrid = () => {
     const {
@@ -11,11 +12,13 @@ const EPGGrid = () => {
         searchQuery,
         favorites,
         toggleFavorite,
-        xtreamCredentials
+        xtreamCredentials,
+        xmltvData,
+        xmltvLastRefresh,
+        setXmltvData
     } = useStore();
-    const [epgData, setEpgData] = useState({}); // { streamId: [listings] }
     const [loadingEpg, setLoadingEpg] = useState(false);
-    const [epgDisabled, setEpgDisabled] = useState(false);
+    const [error, setError] = useState(null);
 
     const filteredChannels = useMemo(() => {
         let base = channels;
@@ -35,52 +38,82 @@ const EPGGrid = () => {
         return base;
     }, [channels, currentGroup, favorites, searchQuery]);
 
-    // Fetch EPG for visible channels
-    useEffect(() => {
-        const fetchAllEpg = async () => {
-            if (!xtreamCredentials || filteredChannels.length === 0 || epgDisabled) return;
-            setLoadingEpg(true);
-            const newEpg = { ...epgData };
+    // Check if XMLTV needs refresh (8 hours = 8 * 60 * 60 * 1000 ms)
+    const needsRefresh = useMemo(() => {
+        if (!xmltvLastRefresh) return true;
+        const eightHours = 8 * 60 * 60 * 1000;
+        const now = Date.now();
+        return (now - xmltvLastRefresh) > eightHours;
+    }, [xmltvLastRefresh]);
 
-            // Only try first 10 channels to check health
-            const channelsToFetch = filteredChannels.slice(0, 10);
-            let failures = 0;
-
-            try {
-                for (const channel of channelsToFetch) {
-                    if (channel.id && !newEpg[channel.id]) {
-                        const listings = await fetchXtreamEPG(
-                            xtreamCredentials.url,
-                            xtreamCredentials.user,
-                            xtreamCredentials.pass,
-                            channel.id
-                        );
-                        if (listings.length > 0) {
-                            newEpg[channel.id] = listings;
-                        } else {
-                            failures++;
-                        }
-                    }
-                }
-
-                // If more than 80% fail, disable for this session
-                if (failures > 8) setEpgDisabled(true);
-
-                setEpgData(newEpg);
-            } catch (err) {
-                setEpgDisabled(true);
-            } finally {
-                setLoadingEpg(false);
+    // Fetch XMLTV data
+    const fetchXMLTV = useCallback(async (force = false) => {
+        if (!xtreamCredentials) return;
+        
+        // Don't fetch if we have recent data and not forcing
+        if (!force && xmltvData && xmltvLastRefresh) {
+            const eightHours = 8 * 60 * 60 * 1000;
+            const now = Date.now();
+            if ((now - xmltvLastRefresh) < eightHours) {
+                return; // Data is still fresh
             }
-        };
+        }
 
-        const timer = setTimeout(fetchAllEpg, 1500);
-        return () => clearTimeout(timer);
-    }, [filteredChannels, xtreamCredentials, epgDisabled]);
+        setLoadingEpg(true);
+        setError(null);
+
+        try {
+            console.log('Fetching XMLTV data...');
+            const xmlString = await fetchXtreamXMLTV(
+                xtreamCredentials.url,
+                xtreamCredentials.user,
+                xtreamCredentials.pass
+            );
+            
+            console.log('Parsing XMLTV data...');
+            const parsedData = parseXMLTV(xmlString);
+            const channelCount = Object.keys(parsedData).length;
+            console.log(`XMLTV parsed successfully: ${channelCount} channels with EPG data`);
+            
+            setXmltvData(parsedData, Date.now());
+            setError(null); // Clear any previous errors
+        } catch (err) {
+            console.error('Failed to fetch/parse XMLTV:', err);
+            const errorMessage = err.message || 'Unknown error occurred';
+            setError(`Failed to load EPG data: ${errorMessage}. Please try refreshing manually.`);
+        } finally {
+            setLoadingEpg(false);
+        }
+    }, [xtreamCredentials, xmltvData, xmltvLastRefresh, setXmltvData]);
+
+    // Initial load and auto-refresh check
+    useEffect(() => {
+        if (!xtreamCredentials || channels.length === 0) return;
+
+        // Fetch if we don't have data or it needs refresh
+        if (!xmltvData || needsRefresh) {
+            fetchXMLTV();
+        }
+
+        // Set up interval to check for refresh every hour
+        const interval = setInterval(() => {
+            const now = Date.now();
+            const eightHours = 8 * 60 * 60 * 1000;
+            if (!xmltvLastRefresh || (now - xmltvLastRefresh) > eightHours) {
+                fetchXMLTV();
+            }
+        }, 60 * 60 * 1000); // Check every hour
+
+        return () => clearInterval(interval);
+    }, [xtreamCredentials, channels.length, xmltvData, xmltvLastRefresh, needsRefresh, fetchXMLTV]);
 
     const handleToggleFav = (e, channelName) => {
         e.stopPropagation();
         toggleFavorite(channelName);
+    };
+
+    const handleManualRefresh = () => {
+        fetchXMLTV(true);
     };
 
     // Generate a mock timeline for the next 4 hours
@@ -94,11 +127,51 @@ const EPGGrid = () => {
         return time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     });
 
-    const safeAtob = (str) => {
+    // Get EPG data for a channel
+    const getChannelEPG = (channel) => {
+        if (!xmltvData) return null;
+        
+        // Try multiple matching strategies:
+        // 1. By epgId (from Xtream API)
+        // 2. By channel ID (stream_id)
+        // 3. By channel name (normalized)
+        // 4. By channel name with different variations
+        let programmes = null;
+        
+        if (channel.epgId) {
+            programmes = xmltvData[channel.epgId];
+        }
+        
+        if (!programmes && channel.id) {
+            programmes = xmltvData[channel.id] || 
+                        xmltvData[String(channel.id)];
+        }
+        
+        if (!programmes && channel.name) {
+            programmes = xmltvData[channel.name] ||
+                        xmltvData[channel.name.toLowerCase()] ||
+                        xmltvData[channel.name.toUpperCase()];
+        }
+        
+        if (!programmes || programmes.length === 0) return null;
+        
+        return getCurrentAndNextProgram(programmes);
+    };
+
+    // Format time for display
+    const formatTime = (xmltvTime) => {
+        if (!xmltvTime) return '';
         try {
-            return str ? decodeURIComponent(escape(window.atob(str))) : '';
+            // Parse XMLTV time format (YYYYMMDDHHmmss)
+            const year = xmltvTime.substring(0, 4);
+            const month = xmltvTime.substring(4, 6);
+            const day = xmltvTime.substring(6, 8);
+            const hour = xmltvTime.substring(8, 10);
+            const minute = xmltvTime.substring(10, 12);
+            
+            return `${hour}:${minute}`;
         } catch (e) {
-            return str || '';
+            return '';
         }
     };
 
@@ -109,6 +182,16 @@ const EPGGrid = () => {
                 <div className="w-[200px] flex-shrink-0 p-4 border-r border-gray-800 flex items-center gap-2 font-bold text-tv-accent">
                     {loadingEpg ? <Loader2 className="animate-spin" size={16} /> : <Clock size={16} />}
                     <span>Timeline</span>
+                    {xtreamCredentials && (
+                        <button
+                            onClick={handleManualRefresh}
+                            disabled={loadingEpg}
+                            className="ml-auto p-1.5 rounded hover:bg-gray-800 transition-colors disabled:opacity-50"
+                            title="Refresh EPG"
+                        >
+                            <RefreshCw size={14} className={loadingEpg ? 'animate-spin' : ''} />
+                        </button>
+                    )}
                 </div>
                 <div className="flex flex-1 overflow-x-hidden">
                     {hours.map((time, idx) => (
@@ -118,6 +201,12 @@ const EPGGrid = () => {
                     ))}
                 </div>
             </div>
+
+            {error && (
+                <div className="bg-red-500/10 border-b border-red-500/20 px-4 py-2 text-sm text-red-400">
+                    {error}
+                </div>
+            )}
 
             {/* Grid Content */}
             <div className="flex-1 overflow-auto epg-grid-container custom-scrollbar">
@@ -154,9 +243,9 @@ const EPGGrid = () => {
                     {/* Programs Grid */}
                     <div className="flex-1 bg-gray-900/10">
                         {filteredChannels.map((channel, idx) => {
-                            const listings = epgData[channel.id] || [];
-                            const currentProgram = listings[0];
-                            const nextProgram = listings[1];
+                            const epg = getChannelEPG(channel);
+                            const currentProgram = epg?.current;
+                            const nextProgram = epg?.next;
 
                             return (
                                 <div key={`${channel.id || channel.name}-${idx}`} className="h-20 flex border-b border-gray-800/30 min-w-max">
@@ -164,19 +253,19 @@ const EPGGrid = () => {
                                         <>
                                             <div className="min-w-[350px] bg-tv-accent/5 border-r border-tv-accent/10 p-4 flex flex-col justify-center">
                                                 <p className="text-xs font-bold text-tv-accent truncate uppercase tracking-tight">
-                                                    {safeAtob(currentProgram.title || '')}
+                                                    {currentProgram.title || 'Live Broadcast'}
                                                 </p>
                                                 <p className="text-[10px] text-gray-500 line-clamp-1 mt-1 leading-relaxed">
-                                                    {safeAtob(currentProgram.description || '') || 'Live Broadcast'}
+                                                    {currentProgram.description || 'Live Broadcast'}
                                                 </p>
                                             </div>
                                             {nextProgram && (
                                                 <div className="min-w-[450px] p-4 flex flex-col justify-center border-r border-gray-800/20">
                                                     <p className="text-xs font-bold text-white/90 truncate uppercase tracking-tight">
-                                                        NEXT: {safeAtob(nextProgram.title || '')}
+                                                        NEXT: {nextProgram.title || 'Upcoming'}
                                                     </p>
                                                     <p className="text-[10px] text-gray-500 truncate mt-1">
-                                                        {nextProgram.start.split(' ')[1].slice(0, 5)} - {nextProgram.end.split(' ')[1].slice(0, 5)}
+                                                        {formatTime(nextProgram.start)} - {formatTime(nextProgram.end)}
                                                     </p>
                                                 </div>
                                             )}
