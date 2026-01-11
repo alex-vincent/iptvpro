@@ -73,7 +73,7 @@ const DraggableToggle = ({ onToggle }) => {
                 left: `${position.x}px`,
                 top: `${position.y}px`
             }}
-            className="fixed z-[60] p-3 bg-tv-surface border border-gray-800 rounded-xl text-tv-accent hover:bg-gray-800 transition-colors shadow-2xl active:scale-110 cursor-move animate-in fade-in duration-300 group"
+            className="fixed z-[60] p-2 bg-tv-surface rounded-xl text-tv-accent hover:bg-gray-800 transition-colors shadow-2xl active:scale-110 cursor-move animate-in fade-in duration-300 group"
             title="Drag to move, click to open"
         >
             <ChevronRight size={24} className="group-hover:translate-x-0.5 transition-transform" />

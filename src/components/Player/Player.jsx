@@ -3,8 +3,7 @@ import Hls from 'hls.js';
 import { useStore } from '../../store/useStore';
 import {
     Play, Pause, Volume2, VolumeX, Maximize,
-    ArrowLeft, ChevronLeft, ChevronRight,
-    Monitor, PictureInPicture
+    ArrowLeft, Monitor, PictureInPicture
 } from 'lucide-react';
 
 const Player = ({ streamUrl, title }) => {
@@ -148,18 +147,6 @@ const Player = ({ streamUrl, title }) => {
                         </div>
                     </div>
                 </div>
-            </div>
-
-            {/* Fast Channel Navigation (Overlays on Sides) */}
-            <div className={`absolute inset-y-0 left-0 flex items-center p-4 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-                <button className="p-4 bg-white/10 backdrop-blur-md rounded-full text-white/50 hover:text-white hover:bg-white/20 transition">
-                    <ChevronLeft size={32} />
-                </button>
-            </div>
-            <div className={`absolute inset-y-0 right-0 flex items-center p-4 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-                <button className="p-4 bg-white/10 backdrop-blur-md rounded-full text-white/50 hover:text-white hover:bg-white/20 transition">
-                    <ChevronRight size={32} />
-                </button>
             </div>
         </div>
     );

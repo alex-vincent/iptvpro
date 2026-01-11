@@ -23,14 +23,18 @@ function App() {
         isSyncing,
         setIsSyncing,
         forceShowPlaylistManager,
-        setForceShowPlaylistManager
+        setForceShowPlaylistManager,
+        setXtreamCredentials
     } = useStore();
 
     useEffect(() => {
         const syncData = async () => {
-            if (!user || channels.length > 0) return;
+            if (!user) return;
 
-            setIsSyncing(true);
+            // Only block UI if we have no channels at all
+            const needsInitialSync = channels.length === 0;
+            if (needsInitialSync) setIsSyncing(true);
+
             try {
                 const docRef = doc(db, 'users', user.uid);
                 const docSnap = await getDoc(docRef);
@@ -41,6 +45,7 @@ function App() {
 
                     if (data.type === 'xtream' && data.xtream) {
                         const { url, user: u, pass } = data.xtream;
+                        setXtreamCredentials({ url, user: u, pass });
                         await loginXtream(url, u, pass);
                         const fetchedChannels = await fetchXtreamChannels(url, u, pass);
                         setChannels(fetchedChannels);
@@ -57,7 +62,8 @@ function App() {
         };
 
         if (user) syncData();
-    }, [user, setChannels, setFavorites, setIsSyncing]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user]); // Only run when user changes (login/logout)
 
     if (loading || (user && isSyncing && channels.length === 0)) {
         return (
@@ -94,10 +100,10 @@ function App() {
     }
 
     return (
-        <div className="relative flex h-screen w-screen bg-tv-bg overflow-hidden text-white">
+        <div className="flex h-screen w-screen bg-tv-bg overflow-hidden text-white">
             {!isSidebarOpen && <DraggableToggle onToggle={toggleSidebar} />}
             <Sidebar />
-            <main className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'ml-80' : 'ml-0'}`}>
+            <main className="flex-1 h-full min-w-0 relative">
                 {selectedChannel ? (
                     <Player streamUrl={selectedChannel.url} title={selectedChannel.name} />
                 ) : (forceShowPlaylistManager || (!channels || channels.length === 0)) ? (

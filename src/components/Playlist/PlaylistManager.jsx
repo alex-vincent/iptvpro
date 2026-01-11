@@ -5,16 +5,23 @@ import { useAuth } from '../../hooks/useAuth';
 import { useStore } from '../../store/useStore';
 import { fetchPlaylist } from '../../utils/m3uParser';
 import { fetchXtreamChannels, loginXtream } from '../../utils/xtreamClient';
-import { Plus, Database, Globe, Key, Loader2, Server, User, Lock, ArrowLeft } from 'lucide-react';
+import { Plus, Database, Globe, Key, Loader2, Server, User, Lock, ArrowLeft, Trash2 } from 'lucide-react';
 
 const PlaylistManager = () => {
     const { user } = useAuth();
-    const { setChannels, setForceShowPlaylistManager, forceShowPlaylistManager, channels } = useStore();
+    const { setChannels, setForceShowPlaylistManager, forceShowPlaylistManager, channels, clearCache, setXtreamCredentials } = useStore();
     const [mode, setMode] = useState('m3u'); // 'm3u' or 'xtream'
     const [url, setUrl] = useState('');
     const [xtream, setXtream] = useState({ url: '', user: '', pass: '' });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    const handleClearCache = () => {
+        if (confirm('Are you sure you want to clear the local playlist cache? This will reload data from the server.')) {
+            clearCache();
+            window.location.reload(); // Force reload to trigger fresh sync
+        }
+    };
 
     useEffect(() => {
         const loadSaved = async () => {
@@ -66,6 +73,7 @@ const PlaylistManager = () => {
         setLoading(true);
         setError(null);
         try {
+            setXtreamCredentials(credentials);
             await loginXtream(credentials.url, credentials.user, credentials.pass);
             const fetched = await fetchXtreamChannels(credentials.url, credentials.user, credentials.pass);
             setChannels(fetched);
@@ -103,13 +111,23 @@ const PlaylistManager = () => {
                         </div>
                     </div>
                     {forceShowPlaylistManager && channels?.length > 0 && (
-                        <button
-                            onClick={onBack}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition active:scale-95"
-                        >
-                            <ArrowLeft size={18} />
-                            Back to Player
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleClearCache}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition active:scale-95 text-xs"
+                                title="Clear local cache"
+                            >
+                                <Trash2 size={16} />
+                                Clear Cache
+                            </button>
+                            <button
+                                onClick={onBack}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition active:scale-95"
+                            >
+                                <ArrowLeft size={18} />
+                                Back to Player
+                            </button>
+                        </div>
                     )}
                 </div>
 

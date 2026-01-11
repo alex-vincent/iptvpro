@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useStore } from '../../store/useStore';
-import { Menu, X, Monitor, List, Settings, LogOut, Star, Search } from 'lucide-react';
+import { Menu, ChevronLeft, Monitor, List, Settings, LogOut, Star, Search } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -66,7 +66,7 @@ const Sidebar = () => {
 
     return (
         <aside
-            className={`fixed top-0 left-0 h-full bg-tv-surface transition-all duration-300 z-50 shadow-2xl flex flex-col ${isSidebarOpen ? 'w-80' : 'w-0 overflow-hidden'
+            className={`relative h-full bg-tv-surface transition-all duration-300 flex flex-col flex-shrink-0 ${isSidebarOpen ? 'w-80' : 'w-0 overflow-hidden'
                 }`}
         >
             <div className="flex flex-col h-full border-r border-gray-800">
@@ -76,8 +76,8 @@ const Sidebar = () => {
                             <Monitor className="text-tv-accent" />
                             IPTV Pro
                         </h2>
-                        <button onClick={toggleSidebar} className="text-gray-400 hover:text-white">
-                            <X size={20} />
+                        <button onClick={toggleSidebar} className="text-tv-accent hover:text-blue-400 transition-transform hover:-translate-x-1">
+                            <ChevronLeft size={24} />
                         </button>
                     </div>
 
