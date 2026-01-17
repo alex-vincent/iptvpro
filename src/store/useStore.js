@@ -15,12 +15,16 @@ export const useStore = create(
             forceShowPlaylistManager: false,
             xtreamCredentials: null,
             xmltvData: null, // Parsed XMLTV EPG data: { channelId: [programs] }
+            xmltvData: null, // Parsed XMLTV EPG data: { channelId: [programs] }
             xmltvLastRefresh: null, // Timestamp of last XMLTV refresh
+            customEpgUrl: '', // Custom EPG URL provided by user
 
             setIsSyncing: (val) => set({ isSyncing: val }),
             setForceShowPlaylistManager: (val) => set({ forceShowPlaylistManager: val }),
             setXtreamCredentials: (creds) => set({ xtreamCredentials: creds }),
+            setXtreamCredentials: (creds) => set({ xtreamCredentials: creds }),
             setXmltvData: (data, timestamp) => set({ xmltvData: data, xmltvLastRefresh: timestamp }),
+            setCustomEpgUrl: (url) => set({ customEpgUrl: url }),
 
             setChannels: (channels) => {
                 const groups = ['All', ...new Set(channels.map(c => c.group))];
@@ -60,7 +64,9 @@ export const useStore = create(
                 currentGroup: 'All',
                 searchQuery: '',
                 forceShowPlaylistManager: false,
-                isSyncing: false
+                forceShowPlaylistManager: false,
+                isSyncing: false,
+                customEpgUrl: ''
             }),
         }),
         {
@@ -70,7 +76,9 @@ export const useStore = create(
                 groups: state.groups,
                 favorites: state.favorites,
                 isSidebarOpen: state.isSidebarOpen,
+                isSidebarOpen: state.isSidebarOpen,
                 xtreamCredentials: state.xtreamCredentials,
+                customEpgUrl: state.customEpgUrl,
                 // Note: xmltvData and xmltvLastRefresh are NOT persisted to localStorage
                 // because XMLTV files can be very large and exceed localStorage quota
             }),

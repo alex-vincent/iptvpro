@@ -82,15 +82,19 @@ export const fetchXtreamEPG = async (baseUrl, username, password, streamId) => {
  * @param {string} password - Password
  * @returns {Promise<string>} - XMLTV XML content as string
  */
-export const fetchXtreamXMLTV = async (baseUrl, username, password) => {
-    const url = `${baseUrl}/xmltv.php?username=${username}&password=${password}`;
+/**
+ * Fetch XMLTV file from any URL
+ * @param {string} url - URL of the XMLTV file
+ * @returns {Promise<string>} - XMLTV XML content as string
+ */
+export const fetchXMLTVFromUrl = async (url) => {
     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    
+
     try {
         // Try direct fetch first with timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-        
+
         let response;
         try {
             response = await fetch(url, {
@@ -106,7 +110,7 @@ export const fetchXtreamXMLTV = async (baseUrl, username, password) => {
             console.log('Direct fetch failed, trying proxy...', directError);
             const proxyController = new AbortController();
             const proxyTimeoutId = setTimeout(() => proxyController.abort(), 120000); // 2 min timeout for proxy
-            
+
             try {
                 response = await fetch(proxyUrl, {
                     signal: proxyController.signal,
@@ -120,20 +124,20 @@ export const fetchXtreamXMLTV = async (baseUrl, username, password) => {
                 throw new Error(`Failed to fetch XMLTV: ${proxyError.message || 'Network error'}`);
             }
         }
-        
+
         if (!response.ok) {
             const errorText = await response.text().catch(() => '');
             throw new Error(`HTTP error! status: ${response.status}${errorText ? ` - ${errorText.substring(0, 100)}` : ''}`);
         }
-        
+
         // Check if response is actually XML
         const contentType = response.headers.get('content-type') || '';
         const xmlText = await response.text();
-        
+
         // Log size for debugging
         const sizeMB = (xmlText.length / (1024 * 1024)).toFixed(2);
         console.log(`XMLTV file downloaded: ${sizeMB} MB`);
-        
+
         // Validate it's XML
         if (!xmlText.trim().startsWith('<?xml') && !xmlText.trim().startsWith('<tv')) {
             // Might be an error message
@@ -142,12 +146,12 @@ export const fetchXtreamXMLTV = async (baseUrl, username, password) => {
             }
             throw new Error('Response does not appear to be valid XMLTV format');
         }
-        
+
         // Check if file is too large (warn but don't fail)
         if (xmlText.length > 50 * 1024 * 1024) { // 50MB
             console.warn('XMLTV file is very large, parsing may take a while...');
         }
-        
+
         return xmlText;
     } catch (error) {
         console.error("XMLTV Fetch Error:", error);
@@ -156,4 +160,16 @@ export const fetchXtreamXMLTV = async (baseUrl, username, password) => {
         }
         throw error;
     }
+};
+
+/**
+ * Fetch XMLTV file from Xtream Codes API
+ * @param {string} baseUrl - Base URL of the Xtream server
+ * @param {string} username - Username
+ * @param {string} password - Password
+ * @returns {Promise<string>} - XMLTV XML content as string
+ */
+export const fetchXtreamXMLTV = async (baseUrl, username, password) => {
+    const url = `${baseUrl}/xmltv.php?username=${username}&password=${password}`;
+    return fetchXMLTVFromUrl(url);
 };

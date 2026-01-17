@@ -1,22 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { fetchPlaylist } from '../../utils/m3uParser';
-import { fetchXtreamChannels, loginXtream, fetchXtreamXMLTV } from '../../utils/xtreamClient';
+import { fetchXtreamChannels, loginXtream, fetchXtreamXMLTV, fetchXMLTVFromUrl } from '../../utils/xtreamClient';
 import { parseXMLTV } from '../../utils/xmltvParser';
 import { Plus, Database, Globe, Loader2, Server, User, Lock, ArrowLeft, Trash2, RefreshCw, Clock } from 'lucide-react';
 
 const PlaylistManager = () => {
-    const { 
-        setChannels, 
-        setForceShowPlaylistManager, 
-        forceShowPlaylistManager, 
-        channels, 
-        clearCache, 
+    const {
+        setChannels,
+        setForceShowPlaylistManager,
+        forceShowPlaylistManager,
+        channels,
+        clearCache,
         setXtreamCredentials,
         xtreamCredentials,
         xmltvData,
         xmltvLastRefresh,
-        setXmltvData
+        setXmltvData,
+        customEpgUrl,
+        setCustomEpgUrl
     } = useStore();
     const [mode, setMode] = useState('m3u'); // 'm3u' or 'xtream'
     const [url, setUrl] = useState('');
@@ -98,18 +100,27 @@ const PlaylistManager = () => {
 
     // Handle EPG refresh
     const handleRefreshEPG = async () => {
-        if (!xtreamCredentials) return;
-        
+        if (!xtreamCredentials && !customEpgUrl) {
+            setEpgError("No EPG source configured.");
+            return;
+        }
+
         setRefreshingEpg(true);
         setEpgError(null);
 
         try {
-            const xmlString = await fetchXtreamXMLTV(
-                xtreamCredentials.url,
-                xtreamCredentials.user,
-                xtreamCredentials.pass
-            );
-            
+            let xmlString;
+            if (customEpgUrl) {
+                console.log("Fetching custom EPG from:", customEpgUrl);
+                xmlString = await fetchXMLTVFromUrl(customEpgUrl);
+            } else {
+                xmlString = await fetchXtreamXMLTV(
+                    xtreamCredentials.url,
+                    xtreamCredentials.user,
+                    xtreamCredentials.pass
+                );
+            }
+
             const parsedData = parseXMLTV(xmlString);
             setXmltvData(parsedData, Date.now());
             setEpgError(null);
@@ -254,18 +265,36 @@ const PlaylistManager = () => {
                     )}
                 </div>
 
-                {/* EPG Settings Section - Only show when Xtream credentials are set */}
-                {xtreamCredentials && (
+                {/* EPG Settings Section - Show if we have Xtream credentials OR if we have channels loaded (implied M3U mode) */}
+                {(xtreamCredentials || channels?.length > 0) && (
                     <div className="mt-8 pt-8 border-t border-gray-800">
                         <div className="flex items-center justify-between mb-4">
                             <div>
                                 <h2 className="text-lg font-bold text-white mb-1">EPG Settings</h2>
-                                <p className="text-sm text-gray-400">Electronic Program Guide data</p>
+                                <p className="text-sm text-gray-400">Configure Electronic Program Guide data sources</p>
                             </div>
                         </div>
-                        
+
                         <div className="bg-gray-900/50 rounded-lg p-4 space-y-4">
-                            <div className="flex items-center justify-between">
+                            {/* Custom EPG URL Input */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-400">Custom EPG Source URL (XMLTV)</label>
+                                <div className="relative">
+                                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                                    <input
+                                        type="text"
+                                        value={customEpgUrl}
+                                        onChange={(e) => setCustomEpgUrl(e.target.value)}
+                                        placeholder="https://example.com/epg.xml"
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-tv-accent focus:border-transparent outline-none transition"
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                    Overrides default Xtream EPG if provided. Supports .xml and .xml.gz (if server handles decompression).
+                                </p>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-800">
                                 <div className="flex items-center gap-2 text-sm text-gray-400">
                                     <Clock size={16} />
                                     <span>Last Updated:</span>
@@ -282,13 +311,13 @@ const PlaylistManager = () => {
                                     {refreshingEpg ? 'Refreshing...' : 'Refresh EPG'}
                                 </button>
                             </div>
-                            
+
                             {epgError && (
                                 <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-500 text-sm">
                                     {epgError}
                                 </div>
                             )}
-                            
+
                             {xmltvData && (
                                 <div className="text-xs text-gray-500">
                                     EPG data loaded for {Object.keys(xmltvData).length} channels
